@@ -1,11 +1,14 @@
 import asyncio
 import httpx
+import os
 from datetime import datetime
+from dotenv import load_dotenv
 
+load_dotenv()
 
-POSTHOG_API_KEY = "phx_5N4N2VCVs7GluggALQOQi8sssDMj8DDLC1yA1uPv2PZjnh3" 
-POSTHOG_PROJECT_ID = "191436"  
-POSTHOG_URL = "https://us.posthog.com"  
+POSTHOG_API_KEY = os.getenv("POSTHOG_API_KEY")
+POSTHOG_PROJECT_ID = os.getenv("POSTHOG_PROJECT_ID", "191436")  
+POSTHOG_URL = os.getenv("POSTHOG_URL", "https://us.posthog.com")  
 
 DATE_FROM = "2024-07-01"
 DATE_TO = datetime.now().strftime("%Y-%m-%d")
