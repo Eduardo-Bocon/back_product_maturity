@@ -1,5 +1,5 @@
 import asyncio
-import httpx
+import requests
 import os
 from datetime import datetime
 from dotenv import load_dotenv
@@ -35,14 +35,13 @@ async def get_active_users():
             "interval": "month"
         }
     }
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(url, json=data, headers=headers)
-        response_data = resp.json()
+    resp = requests.post(url, json=data, headers=headers)
+    response_data = resp.json()
 
-        print(response_data)
-        
-        # Extract the user count from the response
-        if 'results' in response_data and len(response_data['results']) > 0:
-            return int(response_data['results'][0].get('count', 0))
-        return 0
+    print(response_data)
+    
+    # Extract the user count from the response
+    if 'results' in response_data and len(response_data['results']) > 0:
+        return int(response_data['results'][0].get('count', 0))
+    return 0
     
