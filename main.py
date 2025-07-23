@@ -33,6 +33,10 @@ def save_stages(stages):
     with open(STAGES_FILE, 'w') as f:
         json.dump(stages, f, indent=2)
 
+@app.get("/")
+async def root():
+    return {"message": "Product Maturity API", "status": "running"}
+
 @app.get("/maturity/products")
 async def get_all_products():
     product_ids = ["chorus", "cadence", "kenna", "duet"]
