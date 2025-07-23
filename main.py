@@ -34,6 +34,7 @@ def save_stages(stages):
         json.dump(stages, f, indent=2)
 
 @app.get("/")
+@app.head("/")
 async def root():
     return {"message": "Product Maturity API", "status": "running"}
 
