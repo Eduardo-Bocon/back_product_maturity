@@ -4,9 +4,8 @@ from pydantic import BaseModel
 import json
 import os
 from services.staging import check_staging_alive
-#from services.staging import check_staging_alive
 from services.posthog import get_active_users
-#from services.jira import get_open_p1_bugs
+from services.jira import get_open_p1_bugs
 
 app = FastAPI()
 
@@ -77,7 +76,7 @@ async def evaluate_single_product(product_id: str):
     staging_url = f"https://{product_id}-staging.dooor.ai"
 
     staging = await check_staging_alive(staging_url)
-    #bugs_p1 = get_open_p1_bugs(product_id)
+    bugs_p1 = await get_open_p1_bugs(product_id.upper())
     if product_id == "chorus":
         users = await get_active_users()
     else:
@@ -86,7 +85,7 @@ async def evaluate_single_product(product_id: str):
 
     criterios = {
         "staging": "✅" if staging else "❌",
-        #"bugs_p1": "✅" if bugs_p1 == 0 else "❌",
+        "bugs_p1": "✅" if bugs_p1 == 0 else "❌",
         "active_users": "✅" if users >= 3 else "❌",
         #"flow_completion": "✅" if flow >= 70 else "❌"
     }
