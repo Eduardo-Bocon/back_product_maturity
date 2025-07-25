@@ -5,7 +5,7 @@ import json
 import os
 from services.staging import check_staging_alive
 from services.posthog import get_active_users
-from services.jira import get_open_p1_bugs
+from services.jira import get_open_p1_bugs, get_open_bugs_by_priority, get_open_all_bugs
 
 app = FastAPI()
 
@@ -76,7 +76,9 @@ async def evaluate_single_product(product_id: str):
     staging_url = f"https://{product_id}-staging.dooor.ai"
 
     staging = await check_staging_alive(staging_url)
-    bugs_p1 = await get_open_p1_bugs(product_id.upper())
+    bugs_critical = await get_open_bugs_by_priority(product_id.upper(), ['Highest', 'High'])
+    bugs_medium_plus = await get_open_bugs_by_priority(product_id.upper(), ['Highest', 'High', 'Medium'])
+    bugs_all = await get_open_all_bugs(product_id.upper())
     if product_id == "chorus":
         users = await get_active_users()
     else:
@@ -85,9 +87,12 @@ async def evaluate_single_product(product_id: str):
 
     criterios = {
         "staging": "✅" if staging else "❌",
-        "bugs_p1": "✅" if bugs_p1 == 0 else "❌",
-        "active_users": "✅" if users >= 3 else "❌",
-        #"flow_completion": "✅" if flow >= 70 else "❌"
+        "bugs_critical": "✅" if bugs_critical == 0 else "❌",
+        "bugs_medium_plus": "✅" if bugs_medium_plus == 0 else "❌",
+        "bugs_all": "✅" if bugs_all == 0 else "❌",
+        "active_users_1": "✅" if users > 3 else "❌",
+        "active_users_2": "✅" if users > 10 else "❌",
+        "active_users_3": "✅" if users > 50 else "❌",  
     }
 
     peso = {"✅": 1, "⚠️": 0.5, "❌": 0}
