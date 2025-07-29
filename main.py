@@ -21,12 +21,25 @@ app.add_middleware(
 class StageUpdate(BaseModel):
     stage: str
 
+class ObservationsUpdate(BaseModel):
+    observations: str
+
 STAGES_FILE = "product_stages.json"
 
 def load_stages():
     if os.path.exists(STAGES_FILE):
         with open(STAGES_FILE, 'r') as f:
-            return json.load(f)
+            data = json.load(f)
+            # Handle backward compatibility - convert old format to new format
+            if data and isinstance(list(data.values())[0], str):
+                # Old format: {"product": "stage"}
+                # Convert to new format: {"product": {"stage": "stage"}}
+                converted_data = {}
+                for product_id, stage in data.items():
+                    converted_data[product_id] = {"stage": stage}
+                save_stages(converted_data)  # Save in new format
+                return converted_data
+            return data
     return {}
 
 def save_stages(stages):
@@ -40,7 +53,7 @@ async def root():
 
 @app.get("/maturity/products")
 async def get_all_products():
-    product_ids = ["chorus", "cadence", "kenna", "duet"]
+    product_ids = ["chorus", "cadence", "kenna", "duet", "nest"]
     products = []
     
     for product_id in product_ids:
@@ -55,14 +68,16 @@ async def evaluate_product(product_id: str):
 
 @app.patch("/maturity/products/{product_id}/stage")
 async def update_product_stage(product_id: str, stage_update: StageUpdate):
-    valid_product_ids = ["chorus", "cadence", "kenna", "duet"]
+    valid_product_ids = ["chorus", "cadence", "kenna", "duet", "nest"]
     
     if product_id not in valid_product_ids:
         raise HTTPException(status_code=404, detail="Product not found")
     
     # Load current stages, update the specific product, and save
     stages = load_stages()
-    stages[product_id] = stage_update.stage
+    if product_id not in stages:
+        stages[product_id] = {}
+    stages[product_id]["stage"] = stage_update.stage
     save_stages(stages)
     
     return {
@@ -70,6 +85,27 @@ async def update_product_stage(product_id: str, stage_update: StageUpdate):
         "product_id": product_id,
         "stage": stage_update.stage,
         "message": f"Stage updated to {stage_update.stage} for product {product_id}"
+    }
+
+@app.patch("/maturity/products/{product_id}")
+async def update_product_observations(product_id: str, observations_update: ObservationsUpdate):
+    valid_product_ids = ["chorus", "cadence", "kenna", "duet", "nest"]
+    
+    if product_id not in valid_product_ids:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    # Load current data, update observations, and save
+    stages = load_stages()
+    if product_id not in stages:
+        stages[product_id] = {}
+    stages[product_id]["observations"] = observations_update.observations
+    save_stages(stages)
+    
+    return {
+        "success": True,
+        "product_id": product_id,
+        "observations": observations_update.observations,
+        "message": f"Observations updated for product {product_id}"
     }
 
 async def evaluate_single_product(product_id: str):
@@ -119,9 +155,11 @@ async def evaluate_single_product(product_id: str):
     # Criteria are already boolean values
     criteria_boolean = criterios
     
-    # Load current stage from JSON file
+    # Load current stage and observations from JSON file
     stages = load_stages()
-    current_stage = stages.get(product_id)
+    product_data = stages.get(product_id, {})
+    current_stage = product_data.get("stage")
+    observations = product_data.get("observations")
     
     return {
         "id": product_id,
@@ -136,7 +174,7 @@ async def evaluate_single_product(product_id: str):
         "criteria": criteria_boolean,
         "metrics": {},
         "blockers": [],
-        "nextAction": None,
+        "observations": observations,
         "kickoffDate": None
     }
 

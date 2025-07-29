@@ -1,6 +1,18 @@
 {
-  "chorus": "V3",
-  "cadence": "V2",
-  "kenna": "V3",
-  "duet": "V2"
+  "chorus": {
+    "stage": "V3",
+    "observations": "Jhon esta trabalhando nisso."
+  },
+  "cadence": {
+    "stage": "V2"
+  },
+  "kenna": {
+    "stage": "V3"
+  },
+  "duet": {
+    "stage": "V2"
+  },
+  "nest": {
+    "stage": "V2"
+  }
 }
