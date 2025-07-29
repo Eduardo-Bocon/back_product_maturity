@@ -6,6 +6,7 @@ import os
 from services.staging import check_staging_alive
 from services.posthog import get_active_users
 from services.jira import get_open_p1_bugs, get_open_bugs_by_priority, get_open_all_bugs
+from services.uptime_robot import get_product_uptime
 
 app = FastAPI()
 
@@ -79,6 +80,7 @@ async def evaluate_single_product(product_id: str):
     bugs_critical = await get_open_bugs_by_priority(product_id.upper(), ['Highest', 'High'])
     bugs_medium_plus = await get_open_bugs_by_priority(product_id.upper(), ['Highest', 'High', 'Medium'])
     bugs_all = await get_open_all_bugs(product_id.upper())
+    uptime = await get_product_uptime(product_id)
     if product_id == "chorus":
         users = await get_active_users()
     else:
@@ -86,21 +88,23 @@ async def evaluate_single_product(product_id: str):
     #flow = await get_flow_completion_rate(product_id)
 
     criterios = {
-        "staging": "✅" if staging else "❌",
-        "bugs_critical": "✅" if bugs_critical == 0 else "❌",
-        "bugs_medium_plus": "✅" if bugs_medium_plus == 0 else "❌",
-        "bugs_all": "✅" if bugs_all == 0 else "❌",
-        "active_users_1": "✅" if users > 3 else "❌",
-        "active_users_2": "✅" if users > 10 else "❌",
-        "active_users_3": "✅" if users > 50 else "❌",  
+        "staging": staging,
+        "bugs_critical": bugs_critical == 0,
+        "bugs_medium_plus": bugs_medium_plus == 0,
+        "bugs_all": bugs_all == 0,
+        "uptime_99": uptime is not None and uptime >= 99.0,
+        "uptime_95": uptime is not None and uptime >= 95.0,
+        "active_users_1": users > 3,
+        "active_users_2": users > 10,
+        "active_users_3": users > 50,  
     }
 
-    peso = {"✅": 1, "⚠️": 0.5, "❌": 0}
+    peso = {True: 1, False: 0}
     score = sum(peso[v] for v in criterios.values()) / len(criterios) * 100
 
-    if all(v == "✅" for v in criterios.values()):
+    if all(v for v in criterios.values()):
         status = "READY"
-    elif any(v == "❌" for v in criterios.values()):
+    elif any(not v for v in criterios.values()):
         status = "BLOCKED"
     else:
         status = "ATTENTION"
@@ -112,10 +116,8 @@ async def evaluate_single_product(product_id: str):
         "ATTENTION": "in-progress"
     }
     
-    # Convert criteria from emojis to boolean values
-    criteria_boolean = {}
-    for key, value in criterios.items():
-        criteria_boolean[key] = value == "✅"
+    # Criteria are already boolean values
+    criteria_boolean = criterios
     
     # Load current stage from JSON file
     stages = load_stages()
