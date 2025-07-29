@@ -6,7 +6,7 @@ import os
 from services.staging import check_staging_alive
 from services.posthog import get_active_users
 from services.jira import get_open_p1_bugs, get_open_bugs_by_priority, get_open_all_bugs
-from services.uptime_robot import get_product_uptime
+from services.uptime_robot import get_product_uptime, get_product_response_times
 
 app = FastAPI()
 
@@ -117,6 +117,7 @@ async def evaluate_single_product(product_id: str):
     bugs_medium_plus = await get_open_bugs_by_priority(product_id.upper(), ['Highest', 'High', 'Medium'])
     bugs_all = await get_open_all_bugs(product_id.upper())
     uptime = await get_product_uptime(product_id)
+    response_times = await get_product_response_times(product_id)
     if product_id == "chorus":
         users = await get_active_users()
     else:
@@ -130,6 +131,9 @@ async def evaluate_single_product(product_id: str):
         "bugs_all": bugs_all == 0,
         "uptime_99": uptime is not None and uptime >= 99.0,
         "uptime_95": uptime is not None and uptime >= 95.0,
+        "latency_avg_500": response_times is not None and response_times.get('average_ms', float('inf')) < 500,
+        "latency_avg_1000": response_times is not None and response_times.get('average_ms', float('inf')) < 1000,
+        "latency_p95": response_times is not None and response_times.get('p95_ms', float('inf')) < 1000,
         "active_users_1": users > 3,
         "active_users_2": users > 10,
         "active_users_3": users > 50,  
