@@ -25,7 +25,13 @@ class StageUpdate(BaseModel):
 class ObservationsUpdate(BaseModel):
     observations: str
 
+class ProductCreate(BaseModel):
+    id: str
+    name: str
+    description: str = None
+
 STAGES_FILE = "product_stages.json"
+PRODUCTS_FILE = "products.json"
 
 def load_stages():
     if os.path.exists(STAGES_FILE):
@@ -47,14 +53,96 @@ def save_stages(stages):
     with open(STAGES_FILE, 'w') as f:
         json.dump(stages, f, indent=2)
 
+def load_products():
+    if os.path.exists(PRODUCTS_FILE):
+        with open(PRODUCTS_FILE, 'r') as f:
+            return json.load(f)
+    # Default products if file doesn't exist
+    default_products = {
+        "chorus": {"name": "Chorus", "description": "Main product"},
+        "cadence": {"name": "Cadence", "description": "Cadence product"},
+        "kenna": {"name": "Kenna", "description": "Kenna product"},
+        "duet": {"name": "Duet", "description": "Duet product"},
+        "nest": {"name": "Nest", "description": "Nest product"}
+    }
+    save_products(default_products)
+    return default_products
+
+def save_products(products):
+    with open(PRODUCTS_FILE, 'w') as f:
+        json.dump(products, f, indent=2)
+
+def get_valid_product_ids():
+    products = load_products()
+    return list(products.keys())
+
 @app.get("/")
 @app.head("/")
 async def root():
     return {"message": "Product Maturity API", "status": "running"}
 
+@app.get("/products")
+async def list_products():
+    """List all available products"""
+    products = load_products()
+    return {"products": products}
+
+@app.post("/products")
+async def create_product(product: ProductCreate):
+    """Create a new product"""
+    products = load_products()
+    
+    # Validate product ID format (alphanumeric, lowercase, no spaces)
+    if not product.id.isalnum() or not product.id.islower():
+        raise HTTPException(
+            status_code=400, 
+            detail="Product ID must be alphanumeric and lowercase"
+        )
+    
+    # Check if product already exists
+    if product.id in products:
+        raise HTTPException(status_code=409, detail="Product already exists")
+    
+    # Add new product
+    products[product.id] = {
+        "name": product.name,
+        "description": product.description
+    }
+    save_products(products)
+    
+    return {
+        "success": True,
+        "product": products[product.id],
+        "message": f"Product '{product.id}' created successfully"
+    }
+
+@app.delete("/products/{product_id}")
+async def delete_product(product_id: str):
+    """Delete a product"""
+    products = load_products()
+    
+    if product_id not in products:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    # Remove from products
+    deleted_product = products.pop(product_id)
+    save_products(products)
+    
+    # Also remove from stages if exists
+    stages = load_stages()
+    if product_id in stages:
+        stages.pop(product_id)
+        save_stages(stages)
+    
+    return {
+        "success": True,
+        "deleted_product": deleted_product,
+        "message": f"Product '{product_id}' deleted successfully"
+    }
+
 @app.get("/maturity/products")
 async def get_all_products():
-    product_ids = ["chorus", "cadence", "kenna", "duet", "nest"]
+    product_ids = get_valid_product_ids()
     
     # Pre-fetch all UptimeRobot data in a single API call
     uptime_data = await get_all_products_data(product_ids)
@@ -72,7 +160,7 @@ async def evaluate_product(product_id: str):
 
 @app.patch("/maturity/products/{product_id}/stage")
 async def update_product_stage(product_id: str, stage_update: StageUpdate):
-    valid_product_ids = ["chorus", "cadence", "kenna", "duet", "nest"]
+    valid_product_ids = get_valid_product_ids()
     
     if product_id not in valid_product_ids:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -93,7 +181,7 @@ async def update_product_stage(product_id: str, stage_update: StageUpdate):
 
 @app.patch("/maturity/products/{product_id}")
 async def update_product_observations(product_id: str, observations_update: ObservationsUpdate):
-    valid_product_ids = ["chorus", "cadence", "kenna", "duet", "nest"]
+    valid_product_ids = get_valid_product_ids()
     
     if product_id not in valid_product_ids:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -177,12 +265,18 @@ async def evaluate_single_product(product_id: str, uptime_data: dict = None):
     current_stage = product_data.get("stage")
     observations = product_data.get("observations")
     
+    # Load product details
+    products = load_products()
+    product_info = products.get(product_id, {})
+    product_name = product_info.get("name", product_id)
+    product_description = product_info.get("description")
+    
     return {
         "id": product_id,
-        "name": product_id,  # Using product_id as name for now
+        "name": product_name,
         "stage": current_stage,
         "targetStage": None,
-        "description": None,
+        "description": product_description,
         "daysInStage": None,
         "status": status_mapping.get(status, "in-progress"),
         "readinessScore": score,
