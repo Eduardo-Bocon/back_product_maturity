@@ -6,7 +6,7 @@ import os
 from services.staging import check_staging_alive
 from services.posthog import get_active_users
 from services.jira import get_open_p1_bugs, get_open_bugs_by_priority, get_open_all_bugs
-from services.uptime_robot import get_product_uptime, get_product_response_times
+from services.uptime_robot import get_product_uptime, get_product_response_times, get_all_products_data
 from services.security import check_product_security
 
 app = FastAPI()
@@ -55,10 +55,13 @@ async def root():
 @app.get("/maturity/products")
 async def get_all_products():
     product_ids = ["chorus", "cadence", "kenna", "duet", "nest"]
-    products = []
     
+    # Pre-fetch all UptimeRobot data in a single API call
+    uptime_data = await get_all_products_data(product_ids)
+    
+    products = []
     for product_id in product_ids:
-        product_data = await evaluate_single_product(product_id)
+        product_data = await evaluate_single_product(product_id, uptime_data.get(product_id))
         products.append(product_data)
     
     return {"products": products}
@@ -109,7 +112,7 @@ async def update_product_observations(product_id: str, observations_update: Obse
         "message": f"Observations updated for product {product_id}"
     }
 
-async def evaluate_single_product(product_id: str):
+async def evaluate_single_product(product_id: str, uptime_data: dict = None):
     
     staging_url = f"https://{product_id}-staging.dooor.ai"
 
@@ -117,8 +120,14 @@ async def evaluate_single_product(product_id: str):
     bugs_critical = await get_open_bugs_by_priority(product_id.upper(), ['Highest', 'High'])
     bugs_medium_plus = await get_open_bugs_by_priority(product_id.upper(), ['Highest', 'High', 'Medium'])
     bugs_all = await get_open_all_bugs(product_id.upper())
-    uptime = await get_product_uptime(product_id)
-    response_times = await get_product_response_times(product_id)
+    
+    # Use pre-fetched uptime data if available, otherwise fetch individually
+    if uptime_data:
+        uptime = uptime_data.get('uptime')
+        response_times = uptime_data.get('response_times')
+    else:
+        uptime = await get_product_uptime(product_id)
+        response_times = await get_product_response_times(product_id)
     security_headers = await check_product_security(product_id)
     if product_id == "chorus":
         users = await get_active_users()
